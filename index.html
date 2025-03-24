@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polygon Rotation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <h3>Enter polygon points as an array of [x, y] pairs:</h3>
+    <input type="text" id="pointsInput" placeholder="Example: [[15, 4], [16, 8], [17, 2], [6, 14]]" size="50">
+    <button onclick="drawAndRotatePolygon()">Draw & Rotate Polygon</button>
+    <button onclick="resetCanvas()">Reset</button>
+
+    <script>
+        window.drawAndRotatePolygon = function () {
+            let polygonPoints;
+
+            try {
+                const input = document.getElementById("pointsInput").value.trim();
+                if (!input) throw new Error("Input cannot be empty.");
+
+                polygonPoints = JSON.parse(input);
+                if (!Array.isArray(polygonPoints) || polygonPoints.length < 2) {
+                    throw new Error("Input must be an array with at least 2 [x, y] pairs.");
+                }
+            } catch (e) {
+                alert("Invalid input format. Please use the format: [[x1, y1], [x2, y2], ...]");
+                return;
+            }
+
+            document.querySelectorAll("canvas").forEach(canvas => canvas.remove());
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+
+            const camera = new THREE.OrthographicCamera(
+                window.innerWidth / -20, window.innerWidth / 20,
+                window.innerHeight / 20, window.innerHeight / -20,
+                0.1, 1000
+            );
+            camera.position.set(0, 0, 50);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            let points = polygonPoints.map(p => new THREE.Vector3(p[0], p[1], 0));
+
+            function drawPolygon(vertices, edgeColor, refColor) {
+                const geometry = new THREE.BufferGeometry().setFromPoints(vertices);
+                const material = new THREE.LineBasicMaterial({ color: edgeColor, linewidth: 2 });
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+
+                const refLineGeometry = new THREE.BufferGeometry().setFromPoints([vertices[0], vertices[vertices.length - 1]]);
+                const refLineMaterial = new THREE.LineBasicMaterial({ color: refColor, linewidth: 3 });
+                const refLine = new THREE.Line(refLineGeometry, refLineMaterial);
+                scene.add(refLine);
+            }
+
+            function drawAxes() {
+                const axisMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+
+                const xAxisPoints = [new THREE.Vector3(-30, 0, 0), new THREE.Vector3(30, 0, 0)];
+                const xAxisGeometry = new THREE.BufferGeometry().setFromPoints(xAxisPoints);
+                const xAxis = new THREE.Line(xAxisGeometry, axisMaterial);
+                scene.add(xAxis);
+
+                const yAxisPoints = [new THREE.Vector3(0, -30, 0), new THREE.Vector3(0, 30, 0)];
+                const yAxisGeometry = new THREE.BufferGeometry().setFromPoints(yAxisPoints);
+                const yAxis = new THREE.Line(yAxisGeometry, axisMaterial);
+                scene.add(yAxis);
+            }
+
+            drawAxes();
+            drawPolygon(points, 0x000000, 0x0000ff);
+
+            const A = points[0].clone();
+            const E = points[points.length - 1].clone();
+            let translatedPoints = points.map(p => p.clone().sub(A));
+
+            const dx = E.x - A.x;
+            const dy = E.y - A.y;
+            const theta = -Math.atan2(dy, dx);
+
+            const cosTheta = Math.cos(theta);
+            const sinTheta = Math.sin(theta);
+
+            let rotatedPoints = translatedPoints.map(p => new THREE.Vector3(
+                p.x * cosTheta - p.y * sinTheta,
+                p.x * sinTheta + p.y * cosTheta,
+                0
+            ));
+
+            rotatedPoints = rotatedPoints.map(r => {
+                r.y = r.y > -1 ? r.y : -1 * r.y;
+                return r;
+            });
+
+            drawPolygon(rotatedPoints, 0x000000, 0xff0000);
+
+            // Add labels at each vertex
+            const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+            const loader = new THREE.FontLoader();
+            loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+                rotatedPoints.forEach((point, index) => {
+                    const textGeometry = new THREE.TextGeometry(labels[index], {
+                        font: font,
+                        size: 1,
+                        height: 0.1
+                    });
+
+                    const textMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+                    const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+
+                    textMesh.position.set(point.x + 0.5, point.y + 0.5, 0); // Offset slightly for visibility
+                    scene.add(textMesh);
+                });
+
+                renderer.render(scene, camera);
+            });
+
+            renderer.render(scene, camera);
+        };
+
+        window.resetCanvas = function () {
+            document.getElementById("pointsInput").value = "";
+            document.querySelectorAll("canvas").forEach(canvas => canvas.remove());
+        };
+    </script>
+
+</body>
+</html>
